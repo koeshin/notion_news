@@ -1,0 +1,98 @@
+---
+name: bkend-auth
+description: bkend.ai authentication and security expert skill.
+---
+
+
+# bkend.ai Authentication & Security Guide
+
+## Auth Methods
+
+| Method | Description |
+|--------|-------------|
+| Email + Password | Email/password signup and login |
+| Social (Google) | OAuth 2.0 social login |
+| Social (GitHub) | OAuth 2.0 social login |
+| Magic Link | Email link login (no password) |
+
+## JWT Token Structure
+
+- **Access Token**: 1 hour validity
+- **Refresh Token**: 7 days validity
+- Auto-refresh: `POST /v1/auth/refresh`
+
+## Password Policy
+
+8+ characters, uppercase + lowercase + numbers + special characters
+
+## MCP Auth Tools
+
+| Tool | Purpose |
+|------|---------|
+| 3_howto_implement_auth | Authentication implementation patterns |
+| 6_code_examples_auth | Authentication code examples |
+
+## REST Auth API (18 endpoints)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | /v1/auth/email/signup | Sign up |
+| POST | /v1/auth/email/signin | Sign in |
+| GET | /v1/auth/me | Current user |
+| POST | /v1/auth/refresh | Refresh token |
+| POST | /v1/auth/signout | Sign out |
+| GET | /v1/auth/{provider}/authorize | Social login URL |
+| POST | /v1/auth/{provider}/callback | Social callback |
+| POST | /v1/auth/password/reset/request | Password reset request |
+| POST | /v1/auth/password/reset/confirm | Password reset confirm |
+| POST | /v1/auth/password/change | Change password |
+| POST | /v1/auth/email/verify/send | Send email verification |
+| POST | /v1/auth/email/verify/confirm | Confirm email verification |
+| GET | /v1/auth/sessions | List sessions |
+| DELETE | /v1/auth/sessions/{id} | Delete session |
+| POST | /v1/auth/social/link | Link social account |
+| POST | /v1/auth/social/unlink | Unlink social account |
+| GET | /v1/auth/exists | Check account existence |
+| DELETE | /v1/auth/account | Delete account |
+
+## RBAC (Role-Based Access Control)
+
+| Group | Description | Scope |
+|-------|-------------|-------|
+| admin | Full CRUD | All data |
+| user | Authenticated user | Full read, own write |
+| self | Owner only | createdBy-based |
+| guest | Unauthenticated | Read only (usually) |
+
+## RLS (Row Level Security)
+
+- Per-table row-level access control
+- 4-level policies: admin/user/self/guest
+- Auto-filtering based on createdBy field
+
+## Session Management
+
+- Per-device session tracking
+- `GET /v1/auth/sessions` - List sessions
+- `DELETE /v1/auth/sessions/{id}` - Remove session
+
+## Account Lifecycle
+
+- Social account link/unlink
+- Account existence check
+- Account deletion (GDPR compliance)
+
+## Official Documentation (Live Reference)
+
+For the latest authentication documentation, use WebFetch:
+- Full TOC: https://raw.githubusercontent.com/popup-studio-ai/bkend-docs/main/SUMMARY.md
+- Authentication: https://raw.githubusercontent.com/popup-studio-ai/bkend-docs/main/src/authentication/
+- Security: https://raw.githubusercontent.com/popup-studio-ai/bkend-docs/main/src/security/
+
+---
+
+## Claude Code 원본 참조 정보
+
+- **원본 에이전트**: bkit:bkend-expert
+- **사용자 호출 가능**: false
+- **임포트**: ./templates/shared/bkend-patterns.md

@@ -1,0 +1,8 @@
+feedparser
+google-generativeai
+python-dotenv
+pyyaml
+requests
+pydantic
+pytest
+notion-client

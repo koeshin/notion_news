@@ -1,0 +1,21 @@
+sources:
+  - name: OpenAI
+    url: https://openai.com/news/rss.xml
+  - name: DeepMind
+    url: https://deepmind.google/blog/rss.xml
+  - name: Microsoft AI
+    url: https://blogs.microsoft.com/ai/search/feed/rss2/
+  - name: AWS ML
+    url: https://aws.amazon.com/blogs/machine-learning/feed/
+  - name: Hacker News AI
+    url: https://hnrss.org/newest?q=AI
+  - name: Anthropic Engineering
+    url: https://rsshub.app/anthropic/engineering
+  # - name: Anthropic News
+  #   url: https://www.anthropic.com/feed/news
+  # - name: Anthropic Engineering
+  #   url: https://www.anthropic.com/feed/engineering
+  # - name: Anthropic Research
+  #   url: https://www.anthropic.com/feed/research
+  # - name: Anthropic Frontier Red Team
+  #   url: https://www.anthropic.com/feed/red-team

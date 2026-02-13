@@ -1,0 +1,36 @@
+people:
+  - org: OpenAI
+    name: Sam Altman
+    role: CEO
+    focus: ["Stargate", "for-profit transition", "Worldcoin"]
+    aliases: ["Samuel Altman", "샘 알트만"]
+  - org: OpenAI
+    name: Mark Chen
+    role: CRO
+    focus: ["reasoning models", "o1", "o3", "research strategy"]
+    aliases: ["Mark Chen OpenAI", "첸 마크"]
+  - org: OpenAI
+    name: Jakub Pachocki
+    role: Chief Scientist
+    focus: ["deep learning science", "GPT-Next architecture"]
+    aliases: ["Jakub Pachocki OpenAI", "야쿱 파초츠키"]
+  - org: Anthropic
+    name: Dario Amodei
+    role: CEO
+    focus: ["AI safety", "scaling laws", "interpretability"]
+    aliases: ["Dario Amodei Anthropic", "다리오 아모데이"]
+  - org: Anthropic
+    name: Rahul Patil
+    role: CTO
+    focus: ["enterprise reliability", "security"]
+    aliases: ["Rahul Patil Anthropic", "라훌 파틸"]
+  - org: Google
+    name: Demis Hassabis
+    role: CEO DeepMind
+    focus: ["AlphaFold", "drug discovery", "AGI research"]
+    aliases: ["Demis Hassabis DeepMind", "데미스 하사비스"]
+  - org: Microsoft
+    name: Kevin Scott
+    role: CTO
+    focus: ["AI supercomputing", "Azure infrastructure"]
+    aliases: ["Kevin Scott Microsoft", "케빈 스콧"]

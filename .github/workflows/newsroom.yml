@@ -1,0 +1,55 @@
+name: Notion Newsroom Pipeline
+
+on:
+  schedule:
+    # Run every 12 hours (e.g., at 00:00 and 12:00 UTC)
+    - cron: '0 */12 * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+permissions:
+  contents: write  # Needed to commit state.json
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11' 
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run Pipeline
+      env:
+        GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+        DRY_RUN: 'False'  # Enable real execution
+        # Fixed date can be removed or set dynamically if needed, 
+        # but for production it should default to 'now' (handled in code if env not set)
+      run: |
+        python main.py
+
+    - name: Commit State
+      run: |
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+        git add state/state.json
+        # Only commit if there are changes
+        git diff --quiet && diff_status=0 || diff_status=1
+        if [ $diff_status -eq 1 ]; then
+          git commit -m "Update pipeline state [skip ci]"
+          git push
+        else
+          print("No changes to state.")
+        fi

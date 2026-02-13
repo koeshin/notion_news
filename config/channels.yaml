@@ -1,0 +1,18 @@
+channels:
+  - name: OpenAI
+    handle: "@OpenAI"
+    channel_id: "UCwWhs_6x42TfG2_h3z-kSpg"
+    mode: "uploads"
+    enabled: true
+
+  - name: Anthropic
+    handle: "@anthropic-ai"
+    channel_id: null
+    mode: "uploads"
+    enabled: true
+
+  - name: Google DeepMind
+    handle: "@googledeepmind"
+    channel_id: "UCP7jMXSY2xbc3KCAE0MHQ-A"
+    mode: "uploads"
+    enabled: true
