@@ -16,7 +16,6 @@ venv_newroom/
 .DS_Store
 
 # State
-state/state.json
 
 # Artifacts/Temp
 *.log
