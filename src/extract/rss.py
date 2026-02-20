@@ -23,8 +23,7 @@ def extract_rss(sources_path: str, seen_ids: set, target_date: datetime = None) 
     
     items = []
     
-    # Ensure target_date is date-only for comparison if provided
-    target_dt_date = target_date.date() if target_date else None
+    items = []
 
     for source in config.get("sources", []):
         # Skip commented out or empty sources (yaml parser might return None for empty ones, but here we iterate list)
@@ -46,7 +45,8 @@ def extract_rss(sources_path: str, seen_ids: set, target_date: datetime = None) 
                 
                 # Check date first
                 pub_date = parse_date(entry)
-                if target_dt_date and pub_date.date() < target_dt_date:
+                # target_date is already a datetime object (or None)
+                if target_date and pub_date < target_date:
                     skipped_old += 1
                     continue
 

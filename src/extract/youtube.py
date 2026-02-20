@@ -198,8 +198,6 @@ def extract_youtube(
     selected_people = people[:max_people_per_run]
     
     items = []
-    
-    target_dt_date = target_date.date() if target_date else None
 
     for person in selected_people:
         name = person["name"]
@@ -235,7 +233,7 @@ def extract_youtube(
                 published_at = datetime.datetime.now()
 
             # Date Filter
-            if target_dt_date and published_at.date() < target_dt_date:
+            if target_date and published_at < target_date:
                 skipped_old += 1
                 continue
 
