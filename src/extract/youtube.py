@@ -174,6 +174,7 @@ def extract_youtube(
     people_config_path: str, 
     api_key: str, 
     seen_ids: Set[str], 
+    target_date: Optional[datetime.datetime] = None,
     max_people_per_run: int = 3,
     order: str = "date",
     max_results_per_person: int = 3
@@ -198,6 +199,8 @@ def extract_youtube(
     
     items = []
     
+    target_dt_date = target_date.date() if target_date else None
+
     for person in selected_people:
         name = person["name"]
         aliases = person.get("aliases", [])
@@ -211,18 +214,35 @@ def extract_youtube(
         print(f"Searching YouTube for: {query}...")
         results = search_youtube(api_key, query, max_results=max_results_per_person, order=order)
         
+        skipped_old = 0
+        skipped_duplicates = 0
+        original_count = len(items)
+
         for result in results:
             video_id = result["id"]["videoId"]
             c_id = generate_canonical_id(video_id)
             
-            if c_id in seen_ids:
-                continue
-                
             snippet = result["snippet"]
             title = snippet["title"]
             description = snippet["description"]
             channel_title = snippet["channelTitle"]
             publish_time = snippet["publishedAt"] # 2024-02-05T10:00:00Z
+            
+            # Parse date
+            try:
+                published_at = datetime.datetime.strptime(publish_time, "%Y-%m-%dT%H:%M:%SZ")
+            except ValueError:
+                published_at = datetime.datetime.now()
+
+            # Date Filter
+            if target_dt_date and published_at.date() < target_dt_date:
+                skipped_old += 1
+                continue
+
+            if c_id in seen_ids:
+                skipped_duplicates += 1
+                continue
+                
             
             # Simple alias check in title/description
             # (The search query already enforces the name, but this verifies it's not just a passing mention)
@@ -242,12 +262,6 @@ def extract_youtube(
             # if not match_found:
             #     continue 
             
-            # Parse date
-            try:
-                published_at = datetime.datetime.strptime(publish_time, "%Y-%m-%dT%H:%M:%SZ")
-            except ValueError:
-                published_at = datetime.datetime.now()
-
             item = ContentItem(
                 canonical_id=c_id,
                 type="YouTube",
@@ -262,5 +276,7 @@ def extract_youtube(
             )
             items.append(item)
             seen_ids.add(c_id) # Mark as seen within this run
+        
+        print(f"    -> Found {len(results)} results, Skipped {skipped_duplicates} duplicates, Skipped {skipped_old} old, New {len(items) - original_count}")
             
     return items

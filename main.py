@@ -47,28 +47,28 @@ def main():
     
     # --- 1. Extract ---
     print("\n[Phase 1] Extraction")
-    rss_items = extract_rss(RSS_CONFIG, seen_ids)
+    
+    # Define "Today" (ignoring time)
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    print(f"  - Target Date: items published on or after {today.date()}")
+    
+    rss_items = extract_rss(RSS_CONFIG, seen_ids, target_date=today)
     print(f"  - Extracted {len(rss_items)} RSS items")
     
     youtube_items = []
     yt_api_key = os.getenv("YOUTUBE_API_KEY")
     if yt_api_key:
         # 1.1 Person-based search
-        youtube_items = extract_youtube(PEOPLE_CONFIG, yt_api_key, seen_ids, max_people_per_run=3)
+        youtube_items = extract_youtube(PEOPLE_CONFIG, yt_api_key, seen_ids, target_date=today, max_people_per_run=3)
         print(f"  - Extracted {len(youtube_items)} YouTube person search items")
         
         # 1.2 Channel-based monitor
         # Use last_run_at from state or default to 24h ago
-        last_run_iso = state.get("last_run_at")
-        start_date = None
-        if last_run_iso:
-            start_date = datetime.fromisoformat(last_run_iso)
-        else:
-            from datetime import timedelta
-            start_date = datetime.now() - timedelta(days=1)
-            
-        print(f"  - Monitoring channels since: {start_date}")
-        channel_items = extract_channels(CHANNELS_CONFIG, yt_api_key, seen_ids, start_date=start_date)
+        # But if we want *today only* strictly, we pass target_date. 
+        # extract_channels already has 'start_date', we can use that.
+        
+        print(f"  - Monitoring channels since: {today}")
+        channel_items = extract_channels(CHANNELS_CONFIG, yt_api_key, seen_ids, start_date=today)
         print(f"  - Extracted {len(channel_items)} YouTube channel items")
         youtube_items.extend(channel_items)
     else:
@@ -101,38 +101,92 @@ def main():
     BATCH_SIZE = 10
     total_batches = (len(all_items) + BATCH_SIZE - 1) // BATCH_SIZE
     
-    for i in range(0, len(all_items), BATCH_SIZE):
-        batch = all_items[i:i+BATCH_SIZE]
-        batch_num = i//BATCH_SIZE + 1
-        print(f"\n  > Batch {batch_num}/{total_batches} ({len(batch)} items)...")
-        
-        # 2.1 Transform
-        if google_api_key:
-            try:
-                analyzed_batch = process_batch(batch)
-            except Exception as e:
-                print(f"    [LLM Error] {e}")
-                analyzed_batch = batch # Fallback to raw
-        else:
-            analyzed_batch = batch
+    stats = {
+        "total_items": len(all_items),
+        "processed": 0,
+        "uploaded": 0,
+        "errors": 0,
+        "skipped_dry_run": 0
+    }
 
-        # 2.2 Load
-        for item in analyzed_batch:
-            if loader:
-                print(f"    - Upserting: {item.title[:40]}...", end=" ")
-                status = loader.upsert_item(item)
-                print(f"[{status}]")
-                if status in ["created", "updated"]:
-                    state["seen_canonical_ids"].append(item.canonical_id)
-            else:
-                 print(f"    - [Dry Run/No Loader] {item.title[:40]}... (Imp: {item.importance})")
+    # Sort items by importance/date if needed, but here we just process
+    
+    # Split items for different processing
+    articles = [i for i in all_items if i.type == "Article"]
+    videos = [i for i in all_items if i.type == "YouTube"]
+
+    # Process Articles (with LLM)
+    if articles:
+        print(f"\n[Phase 2a] Processing {len(articles)} Articles (with LLM)")
+        total_batches = (len(articles) + BATCH_SIZE - 1) // BATCH_SIZE
         
-        # Save state periodically (every batch)
+        for i in range(0, len(articles), BATCH_SIZE):
+            batch = articles[i:i+BATCH_SIZE]
+            batch_num = i//BATCH_SIZE + 1
+            print(f"  > Batch {batch_num}/{total_batches} ({len(batch)} items)...")
+            
+            if google_api_key:
+                try:
+                    analyzed_batch = process_batch(batch)
+                except Exception as e:
+                    print(f"    [LLM Error] {e}")
+                    analyzed_batch = batch # Fallback
+            else:
+                analyzed_batch = batch
+            
+            for item in analyzed_batch:
+                stats["processed"] += 1
+                if loader:
+                     print(f"    - Upserting: {item.title[:40]}...", end=" ")
+                     status = loader.upsert_item(item)
+                     print(f"[{status}]")
+                     if status in ["created", "updated"]:
+                        state["seen_canonical_ids"].append(item.canonical_id)
+                        stats["uploaded"] += 1
+                     elif status == "error":
+                        stats["errors"] += 1
+                else:
+                     print(f"    - [Dry Run] {item.title[:40]}...")
+                     stats["skipped_dry_run"] += 1
+            save_state(state)
+
+    # Process Videos (Skip LLM)
+    if videos:
+        print(f"\n[Phase 2b] Processing {len(videos)} Videos (No LLM)")
+        for item in videos:
+            stats["processed"] += 1
+            
+            # Simple description cleanup if needed, but for now raw text is description
+            # Set importance high for videos? or default 3
+            item.importance = 3 
+            
+            if loader:
+                 print(f"    - Upserting: {item.title[:40]}...", end=" ")
+                 status = loader.upsert_item(item)
+                 print(f"[{status}]")
+                 if status in ["created", "updated"]:
+                    state["seen_canonical_ids"].append(item.canonical_id)
+                    stats["uploaded"] += 1
+                 elif status == "error":
+                    stats["errors"] += 1
+            else:
+                 print(f"    - [Dry Run] {item.title[:40]}...")
+                 stats["skipped_dry_run"] += 1
+        
         save_state(state)
 
     # --- 4. Finalize ---
     state["last_run_at"] = datetime.now().isoformat()
     save_state(state)
+    
+    print("\n--- Pipeline Summary ---")
+    print(f"Total Items Found: {stats['total_items']}")
+    print(f"Processed:         {stats['processed']}")
+    print(f"Uploaded:          {stats['uploaded']}")
+    print(f"Errors:            {stats['errors']}")
+    if DRY_RUN or not loader:
+        print(f"Dry Run Skipped:   {stats['skipped_dry_run']}")
+    print("------------------------")
     print("\n--- Pipeline Finished ---")
 
 if __name__ == "__main__":
