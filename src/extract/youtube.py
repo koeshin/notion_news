@@ -6,8 +6,20 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from ..models import ContentItem
 
+import re
+
 def generate_canonical_id(video_id: str) -> str:
     return f"yt:{video_id}"
+
+def parse_iso8601_duration(duration_str: str) -> int:
+    """Parses an ISO 8601 duration string (e.g. PT3M15S, PT1H2M) into total seconds."""
+    match = re.match(r'^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$', duration_str)
+    if not match:
+        return 0
+    hours = int(match.group(1)) if match.group(1) else 0
+    minutes = int(match.group(2)) if match.group(2) else 0
+    seconds = int(match.group(3)) if match.group(3) else 0
+    return hours * 3600 + minutes * 60 + seconds
 
 def search_youtube(api_key: str, query: str, max_results: int = 5, order: str = "date") -> List[dict]:
     try:
@@ -122,6 +134,24 @@ def extract_channels(
                 if not v_results:
                     break
                 
+                # Fetch video durations in a batch
+                video_ids = [res["contentDetails"]["videoId"] for res in v_results]
+                duration_map = {}
+                if video_ids:
+                    try:
+                        vd_request = youtube.videos().list(
+                            part="contentDetails",
+                            id=",".join(video_ids)
+                        )
+                        vd_response = vd_request.execute()
+                        for v in vd_response.get("items", []):
+                            v_id = v["id"]
+                            dur_str = v["contentDetails"]["duration"]
+                            duration_map[v_id] = parse_iso8601_duration(dur_str)
+                    except Exception as e:
+                        print(f"Error fetching durations for batch: {e}")
+
+                skipped_short = 0
                 for res in v_results:
                     video_id = res["contentDetails"]["videoId"]
                     c_id = generate_canonical_id(video_id)
@@ -131,6 +161,12 @@ def extract_channels(
                     description = snippet["description"]
                     channel_title = snippet["channelTitle"]
                     publish_time = snippet["publishedAt"]
+                    
+                    # Check duration
+                    duration_sec = duration_map.get(video_id, 0)
+                    if duration_sec < 180:
+                        skipped_short += 1
+                        continue
                     
                     # Parse date
                     try:
@@ -161,6 +197,9 @@ def extract_channels(
                     )
                     items.append(item)
                     seen_ids.add(c_id)
+                
+                if skipped_short > 0:
+                    print(f"  - Skipped {skipped_short} videos under 3 minutes.")
 
                 next_page_token = pl_response.get("nextPageToken")
                 if not next_page_token:
@@ -212,14 +251,41 @@ def extract_youtube(
         print(f"Searching YouTube for: {query}...")
         results = search_youtube(api_key, query, max_results=max_results_per_person, order=order)
         
+        # We need another batch call to check duration since search.list doesn't provide it
+        video_ids = [res["id"]["videoId"] for res in results if "videoId" in res["id"]]
+        duration_map = {}
+        if video_ids:
+            try:
+                youtube = build("youtube", "v3", developerKey=api_key)
+                vd_request = youtube.videos().list(
+                    part="contentDetails",
+                    id=",".join(video_ids)
+                )
+                vd_response = vd_request.execute()
+                for v in vd_response.get("items", []):
+                    v_id = v["id"]
+                    dur_str = v["contentDetails"]["duration"]
+                    duration_map[v_id] = parse_iso8601_duration(dur_str)
+            except Exception as e:
+                print(f"Error fetching durations for person search: {e}")
+
         skipped_old = 0
         skipped_duplicates = 0
+        skipped_short = 0
         original_count = len(items)
 
         for result in results:
+            if "videoId" not in result["id"]:
+                continue
             video_id = result["id"]["videoId"]
             c_id = generate_canonical_id(video_id)
             
+            # Duration Check
+            duration_sec = duration_map.get(video_id, 0)
+            if duration_sec < 180:
+                skipped_short += 1
+                continue
+
             snippet = result["snippet"]
             title = snippet["title"]
             description = snippet["description"]
@@ -275,6 +341,6 @@ def extract_youtube(
             items.append(item)
             seen_ids.add(c_id) # Mark as seen within this run
         
-        print(f"    -> Found {len(results)} results, Skipped {skipped_duplicates} duplicates, Skipped {skipped_old} old, New {len(items) - original_count}")
+        print(f"    -> Found {len(results)} results, Skipped {skipped_duplicates} duplicates, Skipped {skipped_old} old, Skipped {skipped_short} short, New {len(items) - original_count}")
             
     return items

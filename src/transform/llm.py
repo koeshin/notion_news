@@ -73,6 +73,25 @@ def process_batch(items: List[ContentItem], model_name: str = MODEL_NAME) -> Lis
         )
         
         result_json = json.loads(response.text)
+        
+    except Exception as e:
+        print(f"Error with primary model {model_name}: {e}")
+        fallback_model = "gemini-2.5-flash"
+        print(f"Attempting fallback to {fallback_model}...")
+        try:
+            model = genai.GenerativeModel(fallback_model)
+            response = model.generate_content(
+                prompt,
+                generation_config={"response_mime_type": "application/json"}
+            )
+            result_json = json.loads(response.text)
+        except Exception as fallback_e:
+            print(f"Error with fallback model {fallback_model}: {fallback_e}")
+            # Return original items if failure
+            return items
+
+    # If we got here, we have successful result_json
+    try:
         results_map = {r["id"]: r for r in result_json.get("results", [])}
         
         processed_items = []
@@ -96,8 +115,7 @@ def process_batch(items: List[ContentItem], model_name: str = MODEL_NAME) -> Lis
                 
         return processed_items
         
-    except Exception as e:
-        print(f"Error in LLM processing: {e}")
-        # Return original items if failure
+    except Exception as parse_e:
+        print(f"Error parsing LLM response maps: {parse_e}")
         return items
 
